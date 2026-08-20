@@ -1,5 +1,13 @@
-# Streamlit interface for the customer churn analysis agent.
+# Chat interface for the customer churn analysis agent.
 
+# Streamlit reruns this script after each interaction, so session_state stores
+# the current conversation between reruns. Previous messages are redrawn first,
+# then a new submitted question is sent through the verified agent workflow
+# and both the user question and assistant answer are saved for the next rerun.
+
+
+# Save tool and verification metadata with assistant messages so users can
+# optionally inspect how each answer was computed without cluttering the chat.
 import streamlit as st
 
 from src.agent import answer_question
@@ -18,29 +26,82 @@ st.write(
 )
 
 
-# Use a form so the agent runs only when the user intentionally submits a question.
-with st.form("question_form"):
-
-    user_question = st.text_input(
-        "Ask a question:",
-        placeholder="Which contract type has the highest churn rate?"
-    )
-
-    submitted = st.form_submit_button("Ask")
+# Store the visible conversation so messages remain on screen across Streamlit reruns.
+if "messages" not in st.session_state:
+    st.session_state.messages = []
 
 
-if submitted:
+# Redisplay previous messages and any saved analysis details.
+for message in st.session_state.messages:
 
-    if not user_question.strip():
+    with st.chat_message(message["role"]):
+        st.markdown(message["content"])
 
-        st.warning("Please enter a question.")
+        # Only assistant messages with saved tool information show this section.
+        if "tool_results" in message:
 
-    else:
+            with st.expander("Analysis details"):
 
-        with st.spinner("Analyzing your question..."):
+                for tool_result in message["tool_results"]:
 
+                    st.write(f"**Tool:** `{tool_result['tool']}`")
+
+                    st.write("**Arguments:**")
+                    st.json(tool_result["arguments"])
+
+                st.write(
+                    f"**Verification:** {message['verification']}"
+                )
+
+
+# Display the chat input at the bottom of the page.
+user_question = st.chat_input(
+    "Ask about customer churn..."
+)
+
+
+if user_question:
+
+    # Save the user's message so it remains visible after future reruns.
+    st.session_state.messages.append({
+        "role": "user",
+        "content": user_question
+    })
+
+    # Display the user's message immediately.
+    with st.chat_message("user"):
+        st.markdown(user_question)
+
+
+    # Run the existing verified agent workflow and display the response.
+    with st.chat_message("assistant"):
+
+        with st.spinner("Analyzing..."):
             result = answer_question(user_question)
 
-        st.subheader("Answer")
-
         st.markdown(result["answer"])
+
+        # Let users optionally inspect which tools were used and
+        # whether the computed results passed verification.
+        with st.expander("Analysis details"):
+
+            for tool_result in result["tool_results"]:
+
+                st.write(f"**Tool:** `{tool_result['tool']}`")
+
+                st.write("**Arguments:**")
+                st.json(tool_result["arguments"])
+
+            st.write(
+                f"**Verification:** {result['verification']}"
+            )
+
+
+    # Save the answer and its analysis metadata so both can be
+    # reconstructed when Streamlit reruns the script.
+    st.session_state.messages.append({
+        "role": "assistant",
+        "content": result["answer"],
+        "tool_results": result["tool_results"],
+        "verification": result["verification"]
+    })
