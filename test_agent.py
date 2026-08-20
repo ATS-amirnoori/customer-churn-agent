@@ -1,6 +1,9 @@
 from src.agent import answer_question
 
-question = "What is the predicted churn risk for customer NOT-A-REAL-CUSTOMER?"
+question = (
+    "What would the predicted churn risk be for customer 7590-VHVEG "
+    "if their Contract changed to Two year?"
+)
 
 result = answer_question(question)
 

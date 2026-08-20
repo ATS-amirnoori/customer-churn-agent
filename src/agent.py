@@ -71,7 +71,67 @@ def predict_customer_churn(customer_id):
     return {
         "customer_id": customer_id,
         "prediction": prediction["prediction"],
-        "churn_probability": prediction["churn_probability"]
+        "churn_probability": prediction["churn_probability"],
+        "churn_probability_percent": prediction["churn_probability_percent"]
+    }
+
+# Predict how one controlled change to an existing customer's features would
+# affect the model's estimated churn risk without modifying the original dataset.
+
+WHAT_IF_FEATURES = {
+    "Contract": ["Month-to-month", "One year", "Two year"],
+    "InternetService": ["DSL", "Fiber optic", "No"],
+    "PaperlessBilling": ["Yes", "No"],
+    "PaymentMethod": [
+        "Electronic check",
+        "Mailed check",
+        "Bank transfer (automatic)",
+        "Credit card (automatic)"
+    ]
+}
+
+
+def predict_customer_what_if(customer_id, feature, new_value):
+    """Predict churn risk after changing one approved customer feature."""
+
+    customer = get_customer_by_id(customer_id)
+
+    if "error" in customer:
+        return customer
+
+    if feature not in WHAT_IF_FEATURES:
+        return {
+            "error": f"Unsupported what-if feature: {feature}"
+        }
+
+    if new_value not in WHAT_IF_FEATURES[feature]:
+        return {
+            "error": (
+                f"Unsupported value '{new_value}' for {feature}. "
+                f"Allowed values: {WHAT_IF_FEATURES[feature]}"
+            )
+        }
+
+    original_value = customer[feature]
+
+    customer[feature] = new_value
+
+    customer_features = {
+        key: value
+        for key, value in customer.items()
+        if key not in ["customerID", "Churn"]
+    }
+
+    prediction = predict_churn(customer_features)
+
+    return {
+        "customer_id": customer_id,
+        "changed_feature": feature,
+        "original_value": original_value,
+        "new_value": new_value,
+        "prediction": prediction["prediction"],
+        "churn_probability": prediction["churn_probability"],
+        "churn_probability_percent": prediction["churn_probability_percent"]
     }
 
 # Map simple tool names to the real Python functions they are allowed to execute.
@@ -84,6 +144,7 @@ TOOL_REGISTRY = {
     "get_numeric_summary": get_numeric_summary,
     "get_customer_by_id": get_customer_by_id,
     "predict_customer_churn": predict_customer_churn,
+    "predict_customer_what_if": predict_customer_what_if,
     "get_high_risk_customers": rank_high_risk_customers
 }
 
@@ -266,6 +327,45 @@ TOOL_SCHEMAS = [
     {
         "type": "function",
         "function": {
+            "name": "predict_customer_what_if",
+            "description": (
+                "Estimate an existing customer's churn risk after hypothetically "
+                "changing one supported feature. Use this for what-if questions "
+                "such as changing contract type or payment method."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "customer_id": {
+                        "type": "string",
+                        "description": "Existing customer ID."
+                    },
+                    "feature": {
+                        "type": "string",
+                        "enum": [
+                            "Contract",
+                            "InternetService",
+                            "PaperlessBilling",
+                            "PaymentMethod"
+                        ]
+                    },
+                    "new_value": {
+                        "type": "string",
+                        "description": "New hypothetical value for the selected feature."
+                    }
+                },
+                "required": [
+                    "customer_id",
+                    "feature",
+                    "new_value"
+                ]
+            }
+        }
+    },
+
+    {
+        "type": "function",
+        "function": {
             "name": "get_high_risk_customers",
             "description": (
                 "Rank customers by model-predicted churn probability and return "
@@ -287,6 +387,51 @@ TOOL_SCHEMAS = [
     }
 ]
 
+# Define the exact argument format the structured planner must use for each
+# approved tool. This keeps LLM planning consistent with the real Python
+# function signatures that will execute the request.
+
+PLANNER_TOOL_GUIDE = """
+Approved tools and exact argument formats:
+
+1. get_dataset_summary
+   Arguments: {}
+
+2. get_category_counts
+   Arguments: {"column": "<supported categorical column>"}
+
+3. get_churn_rate_by_category
+   Arguments: {"column": "<supported categorical column>"}
+
+4. get_numeric_summary
+   Arguments: {"column": "<numeric column>"}
+   OR
+   {"column": "<numeric column>", "churn_status": "Yes"}
+   OR
+   {"column": "<numeric column>", "churn_status": "No"}
+
+5. get_customer_by_id
+   Arguments: {"customer_id": "<customer ID>"}
+
+6. predict_customer_churn
+   Arguments: {"customer_id": "<customer ID>"}
+
+7. predict_customer_what_if
+   Arguments:
+   {
+       "customer_id": "<customer ID>",
+       "feature": "<supported feature>",
+       "new_value": "<new value>"
+   }
+
+   Do NOT use a nested "what_if" object.
+
+8. get_high_risk_customers
+   Arguments: {}
+   OR
+   {"top_n": <integer>}
+"""
+
 AGENT_SYSTEM_PROMPT = """
 You are a customer churn analysis agent.
 
@@ -305,6 +450,8 @@ Important rules:
   information, select every tool needed to answer every part.
 - Multiple independent tool calls may be returned in the same plan.
 - Do not stop after answering only one part of a multi-part question.
+- For hypothetical questions about changing an existing customer's feature,
+  use predict_customer_what_if rather than inventing a modified customer record.
 
 Example:
 If the user asks for churn rate by contract AND average MonthlyCharges for
@@ -338,6 +485,7 @@ PLANNER_RESPONSE_FORMAT = {
                                     "get_numeric_summary",
                                     "get_customer_by_id",
                                     "predict_customer_churn",
+                                    "predict_customer_what_if",
                                     "get_high_risk_customers"
                                 ]
                             },
@@ -370,6 +518,8 @@ def plan_tool_calls(user_question):
                 "role": "system",
                 "content": (
                     AGENT_SYSTEM_PROMPT
+                    + "\n\n"
+                    + PLANNER_TOOL_GUIDE
                     + "\nReturn every required tool call in tool_calls. "
                     "The arguments field must contain a JSON object encoded as a string. "
                     "For example: "
@@ -454,7 +604,10 @@ def generate_final_answer(user_question, tool_results):
                     "Answer the user's question using only the computed tool results provided. "
                     "Do not invent, estimate, or add any numbers that are not present in the results. "
                     "If the results do not contain enough information to answer the question, say so. "
-                    "Keep the response clear and concise."
+                    "Keep the response clear and concise. "
+                    "Use numerical values exactly as provided by the computed tool results. "
+                    "Do not perform your own arithmetic or convert values into new numerical forms. "
+                    "If a percentage is provided, use that percentage directly. "
                 )
             },
             {

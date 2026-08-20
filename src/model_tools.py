@@ -16,9 +16,12 @@ def predict_churn(customer_data):
     churn_probability = model.predict_proba(customer_df)[0, 1]
     churn_prediction = model.predict(customer_df)[0]
 
+    probability = float(churn_probability)
+
     return {
         "prediction": "Churn" if churn_prediction == 1 else "Stay",
-        "churn_probability": round(float(churn_probability), 4)
+        "churn_probability": round(probability, 4),
+        "churn_probability_percent": round(probability * 100, 2)
     }
 
 # Score multiple customers with the trained model, sort them by predicted churn probability,
