@@ -18,6 +18,24 @@ st.set_page_config(
     page_icon="📊"
 )
 
+# Provide a small control panel without cluttering the main chat interface.
+with st.sidebar:
+
+    st.header("About")
+
+    st.write(
+        "This agent answers questions using the customer churn dataset "
+        "and a trained churn prediction model."
+    )
+
+    st.write(
+        "Responses are grounded in approved Python analysis tools and "
+        "verified before being returned."
+    )
+
+    if st.button("Clear conversation"):
+        st.session_state.messages = []
+        st.rerun()
 
 st.title("Customer Churn Analysis Agent")
 
