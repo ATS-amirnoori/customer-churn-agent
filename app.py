@@ -94,32 +94,49 @@ if user_question:
     # Run the existing verified agent workflow and display the response.
     with st.chat_message("assistant"):
 
-        with st.spinner("Analyzing..."):
-            result = answer_question(user_question)
+        try:
+            with st.spinner("Analyzing..."):
+                result = answer_question(user_question)
 
-        st.markdown(result["answer"])
+            st.markdown(result["answer"])
 
-        # Let users optionally inspect which tools were used and
-        # whether the computed results passed verification.
-        with st.expander("Analysis details"):
+            with st.expander("Analysis details"):
 
-            for tool_result in result["tool_results"]:
+                for tool_result in result["tool_results"]:
 
-                st.write(f"**Tool:** `{tool_result['tool']}`")
+                    st.write(f"**Tool:** `{tool_result['tool']}`")
 
-                st.write("**Arguments:**")
-                st.json(tool_result["arguments"])
+                    st.write("**Arguments:**")
+                    st.json(tool_result["arguments"])
 
-            st.write(
-                f"**Verification:** {result['verification']}"
+                st.write(
+                    f"**Verification:** {result['verification']}"
+                )
+
+            assistant_message = {
+                "role": "assistant",
+                "content": result["answer"],
+                "tool_results": result["tool_results"],
+                "verification": result["verification"]
+            }
+            
+        # Catch unexpected application or API failures so the Streamlit interface
+        # remains usable instead of exposing a raw traceback to the user.
+        except Exception as error:
+
+            error_message = (
+                "Sorry, I couldn't process that question because an unexpected "
+                "application error occurred."
             )
+
+            st.error(error_message)
+
+            assistant_message = {
+                "role": "assistant",
+                "content": error_message
+            }
 
 
     # Save the answer and its analysis metadata so both can be
     # reconstructed when Streamlit reruns the script.
-    st.session_state.messages.append({
-        "role": "assistant",
-        "content": result["answer"],
-        "tool_results": result["tool_results"],
-        "verification": result["verification"]
-    })
+    st.session_state.messages.append(assistant_message)
