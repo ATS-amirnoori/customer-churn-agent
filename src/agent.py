@@ -463,45 +463,10 @@ customers who churned, request both:
 # Require the planner to return a structured list of every computation needed
 # to fully answer the user's question.
 
+# Ask Groq to return valid JSON for the planner. Python will validate the
+# resulting tool names and arguments before executing anything.
 PLANNER_RESPONSE_FORMAT = {
-    "type": "json_schema",
-    "json_schema": {
-        "name": "agent_tool_plan",
-        "strict": True,
-        "schema": {
-            "type": "object",
-            "properties": {
-                "tool_calls": {
-                    "type": "array",
-                    "items": {
-                        "type": "object",
-                        "properties": {
-                            "tool_name": {
-                                "type": "string",
-                                "enum": [
-                                    "get_dataset_summary",
-                                    "get_category_counts",
-                                    "get_churn_rate_by_category",
-                                    "get_numeric_summary",
-                                    "get_customer_by_id",
-                                    "predict_customer_churn",
-                                    "predict_customer_what_if",
-                                    "get_high_risk_customers"
-                                ]
-                            },
-                            "arguments": {
-                                "type": "string"
-                            }
-                        },
-                        "required": ["tool_name", "arguments"],
-                        "additionalProperties": False
-                    }
-                }
-            },
-            "required": ["tool_calls"],
-            "additionalProperties": False
-        }
-    }
+    "type": "json_object"
 }
 
 # Ask the LLM to create a structured plan containing every computation needed
@@ -520,10 +485,15 @@ def plan_tool_calls(user_question):
                     AGENT_SYSTEM_PROMPT
                     + "\n\n"
                     + PLANNER_TOOL_GUIDE
-                    + "\nReturn every required tool call in tool_calls. "
-                    "The arguments field must contain a JSON object encoded as a string. "
-                    "For example: "
-                    '\'{"column": "Contract"}\'.'
+                    + "\n\n"
+                    + "Return ONLY one valid JSON object. "
+                    "Do not call tools directly. "
+                    "Do not output a function call. "
+                    "Do not include Markdown or explanatory text. "
+                    "Return every computation required to fully answer the user's question. "
+                    "The JSON must use this structure: "
+                    '{"tool_calls": [{"tool_name": "<approved tool>", '
+                    '"arguments": "<JSON object encoded as a string>"}]}.'
                 )
             },
             {
