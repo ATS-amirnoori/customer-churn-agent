@@ -8,6 +8,8 @@
 
 # Save tool and verification metadata with assistant messages so users can
 # optionally inspect how each answer was computed without cluttering the chat.
+
+import traceback
 import streamlit as st
 
 from src.agent import answer_question
@@ -123,6 +125,11 @@ if user_question:
         # Catch unexpected application or API failures so the Streamlit interface
         # remains usable instead of exposing a raw traceback to the user.
         except Exception as error:
+
+            # Print the full traceback to the server logs for debugging while keeping
+            # the user-facing interface clean.
+            print("\nUNEXPECTED APPLICATION ERROR:")
+            traceback.print_exc()
 
             error_message = (
                 "Sorry, I couldn't process that question because an unexpected "
