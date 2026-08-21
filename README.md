@@ -4,7 +4,7 @@ An AI-powered customer churn analysis application that combines a trained machin
 
 The main goal of this project was not just to create a chatbot that talks about a dataset. I wanted specific numerical answers to come from actual computations on the data or from the trained churn model. The LLM is mainly responsible for understanding the user's question, determining what needs to be calculated, and explaining the verified results.
 
-**Live Application:** [ADD STREAMLIT URL AFTER DEPLOYMENT]
+**Live Application:** https://customer-churn-agent-kq8ky8jam2s5sc7cfncyyc.streamlit.app/
 
 ---
 
