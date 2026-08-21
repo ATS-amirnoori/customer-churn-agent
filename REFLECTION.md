@@ -1,0 +1,13 @@
+# Reflection
+
+The hardest part of this project for me was definitely building the agent workflow around the model. The data cleaning, EDA, and machine learning portions were more familiar to me, but working with Groq, LLM planning, tool execution, verification, and all of the small details involved in connecting those pieces together was much newer.
+
+The biggest challenge was getting the agent to reliably handle questions that required more than one calculation. My first approach worked well for simple questions, but when I tested a question asking for both the highest churn-rate contract and the average monthly charge for churned customers, the agent initially handled only one part. That forced me to understand the difference between letting the LLM reason about what needs to happen and letting Python actually perform the work. I eventually changed the planner so that it returns a structured JSON plan containing every required computation, which Python then validates and executes.
+
+I also ran into smaller issues that ended up teaching me a lot. For example, the LLM once generated the wrong argument structure for a what-if tool, and in another test it incorrectly converted a churn probability into a percentage. Instead of trying to make the LLM responsible for fixing those problems, I moved more responsibility into the Python layer. By the end, the design became much clearer to me: the LLM should understand the question and explain the result, while Python should own the data access, model execution, validation, and numerical calculations.
+
+Another thing I learned was how different it is to turn notebook work into an actual application. I had to think about saving and reusing the trained model, organizing code into modules, handling API keys, maintaining Streamlit state, Dockerizing the project, testing failure cases, and deploying the application somewhere other people could actually use it.
+
+With more time, I would first focus on improving the model itself, especially its ability to identify more customers who actually churn. I would also make the analysis tools more flexible so users could ask more detailed questions involving multiple filters or customer segments. On the agent side, I would improve follow-up question handling so previous conversation context could be used naturally, and I would expand the what-if functionality to support multiple controlled feature changes or a completely new hypothetical customer profile.
+
+Overall, the part I gained the most from was understanding how to build a reliable boundary between an LLM and real application logic instead of treating the LLM as the entire system.

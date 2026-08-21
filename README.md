@@ -509,7 +509,7 @@ For the example above, the agent correctly found the contract churn rates but in
 
 The final-answer layer correctly avoided inventing the missing number, but the planning step itself was incomplete.
 
-I changed the planning layer to use **structured JSON output** instead.
+I changed the planning layer to return a **structured JSON object** describing every required tool call instead.
 
 The planner now produces a structure similar to:
 

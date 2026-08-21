@@ -1,8 +1,8 @@
 from src.agent import answer_question
 
 question = (
-    "What would the predicted churn risk be for customer 7590-VHVEG "
-    "if their Contract changed to Two year?"
+    "Which contract type has the highest churn rate, "
+    "and what is the average monthly charge for customers who churned?"
 )
 
 result = answer_question(question)
